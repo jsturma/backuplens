@@ -161,10 +161,49 @@ func scanClamAV(path string, clamdAddr string) (string, error) {
 		// Close current connection and try SCAN instead
 		conn.Close()
 
-		// For SCAN, we need the file to be accessible to ClamAV
-		// When running locally with containerized ClamAV, files must be mounted
-		// For now, return a clear error that will be handled gracefully
-		return "", fmt.Errorf("INSTREAM not supported and SCAN requires file access from container (mount directories or use local ClamAV)")
+		// For SCAN, we need to convert the file path to the container path
+		// Check if we're using local paths (./incoming) and convert to container paths
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		// Try to map host path to container path
+		// If path contains "/incoming/", map to "/incoming/" in container
+		// If path contains "/quarantine/", map to "/quarantine/" in container
+		containerPath := absPath
+		if strings.Contains(absPath, "/incoming/") {
+			// Extract filename and use container path
+			filename := filepath.Base(absPath)
+			containerPath = "/incoming/" + filename
+		} else if strings.Contains(absPath, "/quarantine/") {
+			filename := filepath.Base(absPath)
+			containerPath = "/quarantine/" + filename
+		} else {
+			// Can't determine container path, return error
+			return "", fmt.Errorf("INSTREAM not supported and cannot determine container path for SCAN (file must be in /incoming or /quarantine)")
+		}
+
+		// Try SCAN command with container path
+		conn2, err := dialer.Dial("tcp", addr)
+		if err != nil {
+			return "", fmt.Errorf("failed to reconnect to ClamAV: %w", err)
+		}
+		defer conn2.Close()
+		conn2.SetDeadline(time.Now().Add(30 * time.Second))
+
+		scanCmd := fmt.Sprintf("SCAN %s\n", containerPath)
+		_, err = conn2.Write([]byte(scanCmd))
+		if err != nil {
+			return "", fmt.Errorf("failed to send SCAN command: %w", err)
+		}
+
+		reader2 := bufio.NewReader(conn2)
+		response, err = reader2.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return "", fmt.Errorf("failed to read SCAN response: %w", err)
+		}
+		response = strings.TrimSpace(response)
 	}
 
 	if strings.HasSuffix(response, "FOUND") {
@@ -246,13 +285,20 @@ func processFile(path string, config *ScoringConfig, clamdAddr string, yaraHost 
 	result.MimeType = mt.String()
 
 	// ClamAV scan (non-fatal - continue even if ClamAV is unavailable)
+	log.Printf("[%s] Starting ClamAV scan via %s", filepath.Base(path), clamdAddr)
 	clamResult, err := scanClamAV(path, clamdAddr)
 	if err != nil {
-		// Log error but don't fail the scan - ClamAV might be unavailable in local dev
-		log.Printf("[%s] ClamAV warning: %v (scanning continues)", filepath.Base(path), err)
+		// Log detailed error but don't fail the scan - ClamAV might be unavailable in local dev
+		log.Printf("[%s] ClamAV scan failed: %v (scanning continues with other checks)", filepath.Base(path), err)
 		result.ClamAVResult = ""
 	} else {
-		result.ClamAVResult = clamResult
+		if clamResult != "" {
+			log.Printf("[%s] ClamAV detected threat: %s", filepath.Base(path), clamResult)
+			result.ClamAVResult = clamResult
+		} else {
+			log.Printf("[%s] ClamAV scan completed: no threats found", filepath.Base(path))
+			result.ClamAVResult = ""
+		}
 	}
 
 	// YARA scan
@@ -286,8 +332,17 @@ func processFile(path string, config *ScoringConfig, clamdAddr string, yaraHost 
 		result.Score += config.Weights.HighEntropy
 	}
 
-	// Make decision
-	if result.Score >= config.Thresholds.Quarantine {
+	// Make decision based on thresholds
+	// auto_approve: score <= auto_approve threshold (50)
+	// manual_review: score > auto_approve && <= manual_review threshold (100)
+	// quarantine: score > manual_review threshold (100)
+	if result.Score <= config.Thresholds.AutoApprove {
+		result.Decision = "auto_approve"
+		log.Printf("[%s] Auto-approved (score: %d)", filepath.Base(path), result.Score)
+	} else if result.Score <= config.Thresholds.ManualReview {
+		result.Decision = "manual_review"
+		log.Printf("[%s] Manual review required (score: %d)", filepath.Base(path), result.Score)
+	} else {
 		result.Decision = "quarantine"
 		dst := filepath.Join(quarantineDir, filepath.Base(path))
 		if err := os.Rename(path, dst); err != nil {
@@ -295,12 +350,6 @@ func processFile(path string, config *ScoringConfig, clamdAddr string, yaraHost 
 		} else {
 			log.Printf("[%s] Quarantined (score: %d) -> %s", filepath.Base(path), result.Score, dst)
 		}
-	} else if result.Score >= config.Thresholds.ManualReview {
-		result.Decision = "manual_review"
-		log.Printf("[%s] Manual review required (score: %d)", filepath.Base(path), result.Score)
-	} else {
-		result.Decision = "auto_approve"
-		log.Printf("[%s] Auto-approved (score: %d)", filepath.Base(path), result.Score)
 	}
 
 	// Log details
