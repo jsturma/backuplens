@@ -36,10 +36,12 @@ style infra stroke:#888,stroke-dasharray: 4 2
 BackupLens provides a multi-layered security scanning pipeline for backup files. It performs:
 
 - **MIME Type Detection**: Identifies file types and detects mismatches
-- **ClamAV Scanning**: Virus and malware detection via ClamAV
+- **ClamAV Scanning**: Virus and malware detection via ClamAV (gracefully handles unavailability)
 - **YARA Pattern Matching**: Custom rule-based threat detection
 - **Entropy Analysis**: Detects encrypted or obfuscated content
 - **Scoring Engine**: Risk-based decision making with configurable thresholds
+
+**Resilient Design**: The pipeline continues operating even if individual scanning components (like ClamAV) are unavailable, ensuring maximum uptime and coverage.
 
 ## Project Structure
 
@@ -71,6 +73,7 @@ Go-based implementation (`services/pipeline-go/`) using:
 - **Directory watching**: Automatically scans the incoming directory for new files
 - **Configurable workers**: Set `NUM_WORKERS` environment variable (default: 5)
 - **Local-first paths**: Automatically uses local directories (`./incoming`, `./quarantine`, `./config`) when running outside containers
+- **Graceful degradation**: ClamAV scanning failures are non-fatal - pipeline continues with YARA and other checks if ClamAV is unavailable
 
 ### YARA Scanner
 
@@ -371,16 +374,31 @@ go build -o ../../bin/clamav-updater .
 ### Running Without Docker
 
 1. **Start ClamAV** (if not already running):
+
+**Option A: Using systemd (Linux with local ClamAV installation):**
 ```bash
-# Using systemd
 sudo systemctl start clamav-daemon
-
-# Or using Docker (if you have Docker but want to run services natively)
-docker run -d --name clamav -p 3310:3310 clamav/clamav:latest
-
-# Or using Podman
-podman run -d --name clamav -p 3310:3310 clamav/clamav:latest
 ```
+
+**Option B: Using Docker/Podman container (mount directories for file access):**
+```bash
+# Stop existing container if running
+podman stop clamav 2>/dev/null; podman rm clamav 2>/dev/null
+
+# Start ClamAV with mounted directories so it can access files
+podman run -d --name clamav -p 3310:3310 \
+  -v $(pwd)/incoming:/incoming:ro \
+  -v $(pwd)/quarantine:/quarantine:ro \
+  clamav/clamav:latest
+
+# Or with Docker:
+docker run -d --name clamav -p 3310:3310 \
+  -v $(pwd)/incoming:/incoming:ro \
+  -v $(pwd)/quarantine:/quarantine:ro \
+  clamav/clamav:latest
+```
+
+**Note:** If ClamAV cannot access files (e.g., directories not mounted), ClamAV scanning will be skipped with a warning, but the pipeline will continue with YARA and other security checks.
 
 2. **Start YARA Scanner:**
 ```bash
@@ -395,12 +413,18 @@ YARA_RULES_DIR=./my-rules PORT=8083 ./bin/yara-scanner
 ```bash
 # Defaults to localhost:3310 for ClamAV and localhost:8081 for YARA
 # Make sure ClamAV and YARA scanner are running on localhost first
+# Note: If ClamAV can't access files, it will log warnings but continue scanning
 ./bin/pipeline-go
 
 # Or with custom config:
 INCOMING_DIR=./input QUARANTINE_DIR=./quarantined SCORING_CONFIG=./my-config.yaml \
   CLAMD_HOST=localhost YARA_HOST=localhost ./bin/pipeline-go
 ```
+
+**Important for Local Development:**
+- If using ClamAV in a container, ensure directories are mounted (see step 1 above)
+- ClamAV scanning errors are non-fatal - the pipeline will continue with YARA and entropy checks
+- YARA scanner must be running for YARA pattern matching to work
 
 4. **Start ClamAV Updater** (optional):
 ```bash

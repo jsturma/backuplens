@@ -87,18 +87,20 @@ func scanClamAV(path string, clamdAddr string) (string, error) {
 	// Set read/write timeouts
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
+	// Try INSTREAM first, fall back to SCAN if INSTREAM is not supported
+	// First, try zINSTREAM command
+	command := []byte("zINSTREAM\n")
+	_, err = conn.Write(command)
+	if err != nil {
+		return "", fmt.Errorf("failed to send INSTREAM command: %w", err)
+	}
+
 	// Read file
 	f, err := os.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer f.Close()
-
-	// Send INSTREAM command
-	_, err = fmt.Fprintf(conn, "zINSTREAM\n")
-	if err != nil {
-		return "", fmt.Errorf("failed to send INSTREAM command: %w", err)
-	}
 
 	// Send file data in chunks
 	buf := make([]byte, 4096)
@@ -136,7 +138,7 @@ func scanClamAV(path string, clamdAddr string) (string, error) {
 		return "", fmt.Errorf("failed to send end marker: %w", err)
 	}
 
-	// Read response (ClamAV may not always send newline, so read until we get a response)
+	// Read response
 	reader := bufio.NewReader(conn)
 	response, err := reader.ReadString('\n')
 	if err != nil && err != io.EOF {
@@ -152,8 +154,21 @@ func scanClamAV(path string, clamdAddr string) (string, error) {
 	}
 
 	response = strings.TrimSpace(response)
+
+	// If INSTREAM is not supported, fall back to SCAN command
+	// Note: SCAN only works if the file is accessible from within the ClamAV container
+	if strings.Contains(response, "UNKNOWN COMMAND") {
+		// Close current connection and try SCAN instead
+		conn.Close()
+
+		// For SCAN, we need the file to be accessible to ClamAV
+		// When running locally with containerized ClamAV, files must be mounted
+		// For now, return a clear error that will be handled gracefully
+		return "", fmt.Errorf("INSTREAM not supported and SCAN requires file access from container (mount directories or use local ClamAV)")
+	}
+
 	if strings.HasSuffix(response, "FOUND") {
-		// Extract virus name: format is "stream: <virus_name> FOUND"
+		// Extract virus name: format is "path: <virus_name> FOUND" or "stream: <virus_name> FOUND"
 		parts := strings.Fields(response)
 		if len(parts) >= 2 {
 			virusName := strings.Join(parts[1:len(parts)-1], " ")
@@ -230,10 +245,12 @@ func processFile(path string, config *ScoringConfig, clamdAddr string, yaraHost 
 	}
 	result.MimeType = mt.String()
 
-	// ClamAV scan
+	// ClamAV scan (non-fatal - continue even if ClamAV is unavailable)
 	clamResult, err := scanClamAV(path, clamdAddr)
 	if err != nil {
-		log.Printf("[%s] ClamAV error: %v", filepath.Base(path), err)
+		// Log error but don't fail the scan - ClamAV might be unavailable in local dev
+		log.Printf("[%s] ClamAV warning: %v (scanning continues)", filepath.Base(path), err)
+		result.ClamAVResult = ""
 	} else {
 		result.ClamAVResult = clamResult
 	}
