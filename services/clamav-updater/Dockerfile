@@ -1,10 +1,10 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 RUN apk add --no-cache git
 WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
 COPY main.go .
-RUN go mod init clamav-updater && \
-    go get github.com/gin-gonic/gin && \
-    go build -o clamav-updater main.go
+RUN go build -o clamav-updater main.go
 
 FROM alpine:latest
 # Install docker-cli for runtime detection

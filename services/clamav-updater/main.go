@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -68,20 +69,57 @@ func updateClamAVHandler(c *gin.Context) {
 	cmd := exec.Command(runtime, "exec", "clamav", "freshclam")
 
 	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+
+	// Check for specific error conditions in output
 	if err != nil {
-		log.Printf("ClamAV update failed (%s): %v, output: %s", runtime, err, string(output))
+		// Check for rate limiting (429/403 errors)
+		if strings.Contains(outputStr, "error code 429") || strings.Contains(outputStr, "error code 403") {
+			log.Printf("ClamAV update rate limited (%s): %s", runtime, outputStr)
+			c.JSON(http.StatusTooManyRequests, UpdateResponse{
+				Success:   false,
+				Message:   fmt.Sprintf("Rate limited by ClamAV CDN. Please wait before retrying.\n\n%s", outputStr),
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			})
+			return
+		}
+
+		// Check for outdated ClamAV version
+		if strings.Contains(outputStr, "OUTDATED") {
+			log.Printf("ClamAV installation is outdated (%s): %s", runtime, outputStr)
+			c.JSON(http.StatusBadRequest, UpdateResponse{
+				Success:   false,
+				Message:   fmt.Sprintf("ClamAV installation is outdated. Please update the ClamAV container image.\n\n%s", outputStr),
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			})
+			return
+		}
+
+		// Check for cooldown period
+		if strings.Contains(outputStr, "cool-down") || strings.Contains(outputStr, "retry-after") {
+			log.Printf("ClamAV update on cooldown (%s): %s", runtime, outputStr)
+			c.JSON(http.StatusTooManyRequests, UpdateResponse{
+				Success:   false,
+				Message:   fmt.Sprintf("Update on cooldown. Please wait before retrying.\n\n%s", outputStr),
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			})
+			return
+		}
+
+		// Generic error
+		log.Printf("ClamAV update failed (%s): %v, output: %s", runtime, err, outputStr)
 		c.JSON(http.StatusInternalServerError, UpdateResponse{
 			Success:   false,
-			Message:   fmt.Sprintf("Update failed (%s): %v\nOutput: %s", runtime, err, string(output)),
+			Message:   fmt.Sprintf("Update failed (%s): %v\n\nOutput: %s", runtime, err, outputStr),
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		})
 		return
 	}
 
-	log.Printf("ClamAV database updated successfully (%s): %s", runtime, string(output))
+	log.Printf("ClamAV database updated successfully (%s): %s", runtime, outputStr)
 	c.JSON(http.StatusOK, UpdateResponse{
 		Success:   true,
-		Message:   fmt.Sprintf("Database updated successfully (%s)\n%s", runtime, string(output)),
+		Message:   fmt.Sprintf("Database updated successfully (%s)\n%s", runtime, outputStr),
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	})
 }

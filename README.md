@@ -47,11 +47,13 @@ BackupLens provides a multi-layered security scanning pipeline for backup files.
 BackupLens/
 ├── services/              # Service implementations
 │   ├── pipeline-go/      # Go pipeline implementation
-│   └── yara-scanner/     # YARA scanner service (Go)
+│   ├── yara-scanner/     # YARA scanner service (Go)
+│   └── clamav-updater/   # ClamAV database updater service (Go)
 ├── config/               # Configuration files
 │   └── scoring.yaml      # Scoring weights and thresholds
 ├── docker-compose.yml    # Docker Compose configuration
 ├── podman-compose.yml    # Podman Compose configuration
+├── go.work               # Go workspace file (for multi-module development)
 ├── LICENSE               # MIT License
 └── README.md             # Project documentation
 ```
@@ -87,9 +89,15 @@ Management service for updating ClamAV virus database. Provides HTTP API to trig
 - `GET /health` - Health check
 - `POST /update` - Trigger ClamAV database update
 
+**Error Handling:**
+The service provides intelligent error handling for common ClamAV update scenarios:
+- **Rate Limiting (429)**: Returns appropriate status when ClamAV CDN rate limits requests
+- **Outdated Version**: Detects and reports when ClamAV installation is outdated
+- **Cooldown Periods**: Handles retry-after periods gracefully
+
 ### Supporting Services
 
-- **ClamAV**: Virus scanning daemon
+- **ClamAV**: Virus scanning daemon (using official `clamav/clamav:alpine` image)
 - **c-icap**: ICAP protocol server for ClamAV integration
 
 ## Configuration
@@ -163,6 +171,8 @@ podman exec clamav freshclam
 ```
 
 **Note**: The ClamAV updater service automatically detects and uses Podman or Docker. It requires container runtime socket access to execute updates. The database updates are stored in the persistent volume and will be available after container restarts.
+
+**Important**: The service uses the official ClamAV image (`clamav/clamav:alpine`) which provides up-to-date ClamAV versions. If you encounter rate limiting or version warnings, the service will return appropriate HTTP status codes with detailed error messages.
 
 ## Quick Start
 
@@ -286,7 +296,7 @@ BackupLens can be built and run without Docker using standard Go tooling.
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.25.4 or later (Go 1.23+ required for dependencies)
 - YARA library and development headers (for yara-scanner)
 - ClamAV (for pipeline-go to connect to)
 - Make (optional, for using Makefile)
@@ -351,10 +361,10 @@ go build -o ../../bin/clamav-updater .
 sudo systemctl start clamav-daemon
 
 # Or using Docker (if you have Docker but want to run services natively)
-docker run -d --name clamav -p 3310:3310 mkodockx/docker-clamav:alpine
+docker run -d --name clamav -p 3310:3310 clamav/clamav:alpine
 
 # Or using Podman
-podman run -d --name clamav -p 3310:3310 mkodockx/docker-clamav:alpine
+podman run -d --name clamav -p 3310:3310 clamav/clamav:alpine
 ```
 
 2. **Start YARA Scanner:**

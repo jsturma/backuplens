@@ -1,11 +1,10 @@
-FROM golang:1.21-alpine AS builder
-RUN apk add --no-cache git
+FROM golang:1.25-alpine AS builder
+RUN apk add --no-cache git gcc musl-dev yara-dev
 WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
 COPY main.go .
-RUN go mod init yara-scanner && \
-    go get github.com/gin-gonic/gin && \
-    go get github.com/hillu/go-yara/v4 && \
-    go build -o yara-scanner main.go
+RUN CGO_ENABLED=1 go build -o yara-scanner main.go
 
 FROM alpine:latest
 # Install YARA runtime dependencies
