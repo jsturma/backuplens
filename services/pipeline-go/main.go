@@ -311,11 +311,13 @@ func main() {
 	// Configuration from environment
 	incomingDir := os.Getenv("INCOMING_DIR")
 	if incomingDir == "" {
-		incomingDir = "/incoming"
+		// Default to local path (works both locally and in containers if mounted)
+		incomingDir = "./incoming"
 	}
 	quarantineDir := os.Getenv("QUARANTINE_DIR")
 	if quarantineDir == "" {
-		quarantineDir = "/quarantine"
+		// Default to local path (works both locally and in containers if mounted)
+		quarantineDir = "./quarantine"
 	}
 	configPath := os.Getenv("SCORING_CONFIG")
 	if configPath == "" {

@@ -69,7 +69,15 @@ func (mc *matchCollector) RuleMatching(ctx *yara.ScanContext, rule *yara.Rule) (
 func loadRules() error {
 	rulesDir = os.Getenv("YARA_RULES_DIR")
 	if rulesDir == "" {
-		rulesDir = "/rules"
+		// Try local paths first (for running outside containers)
+		if _, err := os.Stat("./yara-rules"); err == nil {
+			rulesDir = "./yara-rules"
+		} else if _, err := os.Stat("yara-rules"); err == nil {
+			rulesDir = "yara-rules"
+		} else {
+			// Fall back to container path
+			rulesDir = "/rules"
+		}
 	}
 
 	// Check if directory exists
@@ -334,8 +342,13 @@ func main() {
 	r.POST("/scan-file", scanFileHandler)
 	r.POST("/reload", reloadRulesHandler)
 
-	log.Println("YARA Scanner service starting on :8081")
-	if err := r.Run(":8081"); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081"
+	}
+
+	log.Printf("YARA Scanner service starting on :%s", port)
+	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

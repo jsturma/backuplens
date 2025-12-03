@@ -70,16 +70,23 @@ Go-based implementation (`services/pipeline-go/`) using:
 - **Concurrent processing**: Processes multiple files in parallel using a worker pool
 - **Directory watching**: Automatically scans the incoming directory for new files
 - **Configurable workers**: Set `NUM_WORKERS` environment variable (default: 5)
+- **Local-first paths**: Automatically uses local directories (`./incoming`, `./quarantine`, `./config`) when running outside containers
 
 ### YARA Scanner
 
 Standalone YARA scanning service written in Go that provides pattern matching capabilities via HTTP API. Loads rules from local directory at startup for offline operation.
+
+**Default Port:** `8081` (configurable via `PORT` environment variable)
 
 **Endpoints:**
 - `GET /health` - Health check
 - `POST /scan` - Scan uploaded file
 - `POST /scan-file` - Scan file by path
 - `POST /reload` - Reload YARA rules from directory
+
+**Configuration:**
+- `YARA_RULES_DIR`: Rules directory path (default: checks `./yara-rules` first, then `/rules`)
+- `PORT`: Service port (default: `8081`)
 
 ### ClamAV Updater
 
@@ -276,14 +283,17 @@ The pipeline expects the following directories:
 The pipeline can be configured via environment variables:
 
 - `NUM_WORKERS`: Number of concurrent workers (default: 5)
-- `INCOMING_DIR`: Directory to watch for files (default: `/incoming`)
-- `QUARANTINE_DIR`: Directory for quarantined files (default: `/quarantine`)
-- `SCORING_CONFIG`: Path to scoring configuration (default: `/config/scoring.yaml`)
+- `INCOMING_DIR`: Directory to watch for files (default: `./incoming` locally, `/incoming` in containers)
+- `QUARANTINE_DIR`: Directory for quarantined files (default: `./quarantine` locally, `/quarantine` in containers)
+- `SCORING_CONFIG`: Path to scoring configuration (default: checks `./config/scoring.yaml` first, then `/config/scoring.yaml`)
 - `CLAMD_HOST`: ClamAV host (default: `clamav`)
 - `CLAMD_PORT`: ClamAV port (default: `3310`)
 - `YARA_HOST`: YARA scanner host (default: `yara-scanner`)
 - `YARA_PORT`: YARA scanner port (default: `8081`)
-- `PORT`: ClamAV updater service port (default: `8082`)
+- `PORT`: Service port for yara-scanner and clamav-updater (default: `8081` for yara-scanner, `8082` for clamav-updater)
+- `YARA_RULES_DIR`: YARA rules directory (default: checks `./yara-rules` first, then `/rules`)
+
+**Note**: All services use local-first path resolution when running outside containers, automatically falling back to container paths if local paths don't exist. This allows the same binaries to work both locally and in containers.
 
 ## Decision Flow
 
@@ -374,16 +384,20 @@ podman run -d --name clamav -p 3310:3310 clamav/clamav:latest
 
 2. **Start YARA Scanner:**
 ```bash
+# Defaults to ./yara-rules directory
 ./bin/yara-scanner
+
 # Or with custom config:
-YARA_RULES_DIR=./yara-rules ./bin/yara-scanner
+YARA_RULES_DIR=./my-rules PORT=8083 ./bin/yara-scanner
 ```
 
 3. **Start Pipeline:**
 ```bash
+# Defaults to ./incoming, ./quarantine, and ./config/scoring.yaml
 ./bin/pipeline-go
+
 # Or with custom config:
-INCOMING_DIR=./incoming QUARANTINE_DIR=./quarantine ./bin/pipeline-go
+INCOMING_DIR=./input QUARANTINE_DIR=./quarantined SCORING_CONFIG=./my-config.yaml ./bin/pipeline-go
 ```
 
 4. **Start ClamAV Updater** (optional):
