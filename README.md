@@ -64,7 +64,7 @@ BackupLens/
 
 Go-based implementation (`services/pipeline-go/`) using:
 - `mimetype` for MIME type detection
-- `go-clamd` for ClamAV integration
+- Direct TCP connection to ClamAV daemon (`clamd`) for virus scanning
 - YARA scanner HTTP API for pattern matching
 - Built-in entropy analysis
 - **Concurrent processing**: Processes multiple files in parallel using a worker pool
@@ -85,6 +85,8 @@ Standalone YARA scanning service written in Go that provides pattern matching ca
 
 Management service for updating ClamAV virus database. Provides HTTP API to trigger database updates. **Automatically detects and uses Podman or Docker.**
 
+**Default Port:** `8082` (configurable via `PORT` environment variable)
+
 **Endpoints:**
 - `GET /health` - Health check
 - `POST /update` - Trigger ClamAV database update
@@ -97,7 +99,7 @@ The service provides intelligent error handling for common ClamAV update scenari
 
 ### Supporting Services
 
-- **ClamAV**: Virus scanning daemon (using official `clamav/clamav:alpine` image)
+- **ClamAV**: Virus scanning daemon (using official `clamav/clamav:latest` Alpine-based image)
 - **c-icap**: ICAP protocol server for ClamAV integration
 
 ## Configuration
@@ -172,7 +174,7 @@ podman exec clamav freshclam
 
 **Note**: The ClamAV updater service automatically detects and uses Podman or Docker. It requires container runtime socket access to execute updates. The database updates are stored in the persistent volume and will be available after container restarts.
 
-**Important**: The service uses the official ClamAV image (`clamav/clamav:alpine`) which provides up-to-date ClamAV versions. If you encounter rate limiting or version warnings, the service will return appropriate HTTP status codes with detailed error messages.
+**Important**: The service uses the official ClamAV image (`clamav/clamav:latest`) which provides up-to-date ClamAV versions. If you encounter rate limiting or version warnings, the service will return appropriate HTTP status codes with detailed error messages.
 
 ## Quick Start
 
@@ -281,6 +283,7 @@ The pipeline can be configured via environment variables:
 - `CLAMD_PORT`: ClamAV port (default: `3310`)
 - `YARA_HOST`: YARA scanner host (default: `yara-scanner`)
 - `YARA_PORT`: YARA scanner port (default: `8081`)
+- `PORT`: ClamAV updater service port (default: `8082`)
 
 ## Decision Flow
 
@@ -297,9 +300,11 @@ BackupLens can be built and run without Docker using standard Go tooling.
 ### Prerequisites
 
 - Go 1.25.4 or later (Go 1.23+ required for dependencies)
-- YARA library and development headers (for yara-scanner)
+- YARA library and development headers (for yara-scanner) - **CGO required**
 - ClamAV (for pipeline-go to connect to)
 - Make (optional, for using Makefile)
+
+**Note**: The yara-scanner service requires CGO to be enabled as it uses C bindings to the YARA library. This is automatically handled in the Dockerfile, but when building locally, ensure CGO is enabled.
 
 **Install YARA:**
 ```bash
@@ -342,10 +347,10 @@ cd services/pipeline-go
 go mod download
 go build -o ../../bin/pipeline-go .
 
-# Build yara-scanner
+# Build yara-scanner (requires CGO and YARA development libraries)
 cd services/yara-scanner
 go mod download
-go build -o ../../bin/yara-scanner .
+CGO_ENABLED=1 go build -o ../../bin/yara-scanner .
 
 # Build clamav-updater
 cd services/clamav-updater
@@ -361,10 +366,10 @@ go build -o ../../bin/clamav-updater .
 sudo systemctl start clamav-daemon
 
 # Or using Docker (if you have Docker but want to run services natively)
-docker run -d --name clamav -p 3310:3310 clamav/clamav:alpine
+docker run -d --name clamav -p 3310:3310 clamav/clamav:latest
 
 # Or using Podman
-podman run -d --name clamav -p 3310:3310 clamav/clamav:alpine
+podman run -d --name clamav -p 3310:3310 clamav/clamav:latest
 ```
 
 2. **Start YARA Scanner:**
