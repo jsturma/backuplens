@@ -319,7 +319,15 @@ func main() {
 	}
 	configPath := os.Getenv("SCORING_CONFIG")
 	if configPath == "" {
-		configPath = "/config/scoring.yaml"
+		// Try local path first (for running outside containers)
+		if _, err := os.Stat("./config/scoring.yaml"); err == nil {
+			configPath = "./config/scoring.yaml"
+		} else if _, err := os.Stat("config/scoring.yaml"); err == nil {
+			configPath = "config/scoring.yaml"
+		} else {
+			// Fall back to container path
+			configPath = "/config/scoring.yaml"
+		}
 	}
 	clamdHost := os.Getenv("CLAMD_HOST")
 	if clamdHost == "" {
