@@ -1,0 +1,9 @@
+weights:
+mime_mismatch: 30
+clamav_infected: 200
+yara_match: 120
+high_entropy: 40
+thresholds:
+auto_approve: 50
+manual_review: 100
+quarantine: 150

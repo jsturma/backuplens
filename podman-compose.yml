@@ -1,0 +1,88 @@
+version: '3.8'
+services:
+clamav:
+image: mkodockx/docker-clamav:alpine
+container_name: clamav
+ports:
+- "3310:3310" # clamd
+volumes:
+- clamd-db:/var/lib/clamav  # Persistent database volume (works offline)
+- ./clamav-db:/var/lib/clamav/local:ro  # Optional: pre-downloaded .cvd files
+# Note: Database persists in volume, no internet required after initial setup
+# To update database manually: podman exec clamav freshclam (when online)
+restart: unless-stopped
+
+
+c-icap:
+image: schickling/c-icap
+container_name: c-icap
+environment:
+- CI_CAP_MAXSIZE=1073741824
+ports:
+- "1344:1344" # ICAP default
+depends_on:
+- clamav
+restart: unless-stopped
+
+
+yara-scanner:
+build:
+context: ./services/yara-scanner
+dockerfile: Dockerfile
+container_name: yara-scanner
+ports:
+- "8081:8081"
+volumes:
+- ./yara-rules:/rules  # YARA rules (writable for updates)
+environment:
+- YARA_RULES_DIR=/rules  # Use local rules directory
+restart: unless-stopped
+
+
+clamav-updater:
+build:
+context: ./services/clamav-updater
+dockerfile: Dockerfile
+container_name: clamav-updater
+ports:
+- "8082:8082"
+volumes:
+- /run/podman/podman.sock:/run/podman/podman.sock:ro  # Podman socket (read-only)
+environment:
+- CLAMAV_HOST=clamav
+- CLAMAV_PORT=3310
+depends_on:
+- clamav
+restart: unless-stopped
+
+
+pipeline:
+build:
+context: ./services/pipeline-go
+dockerfile: Dockerfile
+container_name: backup-pipeline
+environment:
+- CLAMD_HOST=clamav
+- CLAMD_PORT=3310
+- YARA_HOST=yara-scanner
+- YARA_PORT=8081
+- ICAP_HOST=c-icap
+- ICAP_PORT=1344
+- INCOMING_DIR=/incoming
+- QUARANTINE_DIR=/quarantine
+- SCORING_CONFIG=/config/scoring.yaml
+- NUM_WORKERS=5
+volumes:
+- ./incoming:/incoming
+- ./quarantine:/quarantine
+- ./config:/config:ro
+depends_on:
+- clamav
+- yara-scanner
+- c-icap
+restart: on-failure
+
+
+volumes:
+clamd-db:
+

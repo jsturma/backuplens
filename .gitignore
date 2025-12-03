@@ -1,0 +1,74 @@
+# Local data directories
+incoming/
+quarantine/
+yara-rules/
+clamav-db/
+
+# Build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.a
+
+# Go build cache and temporary files
+*.test
+*.out
+*.prof
+go.work
+go.work.sum
+vendor/
+
+# Go module cache (local)
+.cache/
+
+# Docker/Podman
+*.log
+.docker/
+.podman/
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# Environment and secrets
+.env
+.env.local
+*.key
+*.pem
+*.cert
+secrets/
+*.secret
+
+# Coverage reports
+coverage.txt
+coverage.html
+*.coverprofile
+
