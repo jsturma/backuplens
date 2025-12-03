@@ -286,9 +286,9 @@ The pipeline can be configured via environment variables:
 - `INCOMING_DIR`: Directory to watch for files (default: `./incoming` locally, `/incoming` in containers)
 - `QUARANTINE_DIR`: Directory for quarantined files (default: `./quarantine` locally, `/quarantine` in containers)
 - `SCORING_CONFIG`: Path to scoring configuration (default: checks `./config/scoring.yaml` first, then `/config/scoring.yaml`)
-- `CLAMD_HOST`: ClamAV host (default: `clamav`)
+- `CLAMD_HOST`: ClamAV host (default: `localhost` locally, `clamav` in containers)
 - `CLAMD_PORT`: ClamAV port (default: `3310`)
-- `YARA_HOST`: YARA scanner host (default: `yara-scanner`)
+- `YARA_HOST`: YARA scanner host (default: `localhost` locally, `yara-scanner` in containers)
 - `YARA_PORT`: YARA scanner port (default: `8081`)
 - `PORT`: Service port for yara-scanner and clamav-updater (default: `8081` for yara-scanner, `8082` for clamav-updater)
 - `YARA_RULES_DIR`: YARA rules directory (default: checks `./yara-rules` first, then `/rules`)
@@ -393,11 +393,13 @@ YARA_RULES_DIR=./my-rules PORT=8083 ./bin/yara-scanner
 
 3. **Start Pipeline:**
 ```bash
-# Defaults to ./incoming, ./quarantine, and ./config/scoring.yaml
+# Defaults to localhost:3310 for ClamAV and localhost:8081 for YARA
+# Make sure ClamAV and YARA scanner are running on localhost first
 ./bin/pipeline-go
 
 # Or with custom config:
-INCOMING_DIR=./input QUARANTINE_DIR=./quarantined SCORING_CONFIG=./my-config.yaml ./bin/pipeline-go
+INCOMING_DIR=./input QUARANTINE_DIR=./quarantined SCORING_CONFIG=./my-config.yaml \
+  CLAMD_HOST=localhost YARA_HOST=localhost ./bin/pipeline-go
 ```
 
 4. **Start ClamAV Updater** (optional):

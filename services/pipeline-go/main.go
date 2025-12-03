@@ -333,7 +333,8 @@ func main() {
 	}
 	clamdHost := os.Getenv("CLAMD_HOST")
 	if clamdHost == "" {
-		clamdHost = "clamav"
+		// Default to localhost for local runs, clamav for container runs
+		clamdHost = "localhost"
 	}
 	clamdPort := os.Getenv("CLAMD_PORT")
 	if clamdPort == "" {
@@ -342,7 +343,8 @@ func main() {
 	clamdAddr := fmt.Sprintf("tcp://%s:%s", clamdHost, clamdPort)
 	yaraHost := os.Getenv("YARA_HOST")
 	if yaraHost == "" {
-		yaraHost = "yara-scanner"
+		// Default to localhost for local runs, yara-scanner for container runs
+		yaraHost = "localhost"
 	}
 	yaraPort := os.Getenv("YARA_PORT")
 	if yaraPort == "" {
