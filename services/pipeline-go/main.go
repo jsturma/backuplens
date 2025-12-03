@@ -76,12 +76,16 @@ func scanClamAV(path string, clamdAddr string) (string, error) {
 		addr = clamdAddr
 	}
 
-	// Connect to ClamAV daemon
-	conn, err := net.Dial("tcp", addr)
+	// Connect to ClamAV daemon with timeout
+	dialer := net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.Dial("tcp", addr)
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to ClamAV: %w", err)
 	}
 	defer conn.Close()
+
+	// Set read/write timeouts
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// Read file
 	f, err := os.Open(path)
@@ -132,11 +136,19 @@ func scanClamAV(path string, clamdAddr string) (string, error) {
 		return "", fmt.Errorf("failed to send end marker: %w", err)
 	}
 
-	// Read response
+	// Read response (ClamAV may not always send newline, so read until we get a response)
 	reader := bufio.NewReader(conn)
 	response, err := reader.ReadString('\n')
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+	if err != nil && err != io.EOF {
+		// Try reading without expecting newline
+		conn.SetDeadline(time.Now().Add(5 * time.Second))
+		buf := make([]byte, 1024)
+		n, readErr := reader.Read(buf)
+		if readErr == nil && n > 0 {
+			response = string(buf[:n])
+		} else {
+			return "", fmt.Errorf("failed to read response: %w", err)
+		}
 	}
 
 	response = strings.TrimSpace(response)
