@@ -408,17 +408,21 @@ sudo systemctl start clamav-daemon
 # Stop existing container if running
 podman stop clamav 2>/dev/null; podman rm clamav 2>/dev/null
 
-# Start ClamAV with mounted directories so it can access files
+# Start ClamAV with mounted directories and custom config for debug logging
 podman run -d --name clamav -p 3310:3310 \
   -v $(pwd)/incoming:/incoming:ro \
   -v $(pwd)/quarantine:/quarantine:ro \
-  clamav/clamav:latest
+  -v $(pwd)/config/clamav/clamd.conf:/etc/clamav/clamd.conf:ro \
+  clamav/clamav:latest \
+  clamd --config-file=/etc/clamav/clamd.conf --foreground
 
 # Or with Docker:
 docker run -d --name clamav -p 3310:3310 \
   -v $(pwd)/incoming:/incoming:ro \
   -v $(pwd)/quarantine:/quarantine:ro \
-  clamav/clamav:latest
+  -v $(pwd)/config/clamav/clamd.conf:/etc/clamav/clamd.conf:ro \
+  clamav/clamav:latest \
+  clamd --config-file=/etc/clamav/clamd.conf --foreground
 ```
 
 **Note:** If ClamAV cannot access files (e.g., directories not mounted), ClamAV scanning will be skipped with a warning, but the pipeline will continue with YARA and other security checks.
