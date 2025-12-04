@@ -55,7 +55,9 @@ BackupLens/
 │   └── analyze/          # Analysis tools
 │       └── entropy-map.go  # Entropy analysis tool
 ├── config/               # Configuration files
-│   └── scoring.yaml      # Scoring weights and thresholds
+│   ├── scoring.yaml      # Scoring weights and thresholds
+│   └── clamav/           # ClamAV configuration
+│       └── clamd.conf    # ClamAV daemon config with debug enabled
 ├── docker-compose.yml    # Docker Compose configuration
 ├── podman-compose.yml    # Podman Compose configuration
 ├── go.work               # Go workspace file (for multi-module development)
@@ -113,6 +115,9 @@ The service provides intelligent error handling for common ClamAV update scenari
 ### Supporting Services
 
 - **ClamAV**: Virus scanning daemon (using official `clamav/clamav:latest` Alpine-based image)
+  - **Debug Logging**: Enabled via custom configuration file (`config/clamav/clamd.conf`)
+  - **Log Output**: Debug logs are sent to stdout and can be viewed with `docker logs clamav` or `podman logs clamav`
+  - **Verbose Mode**: Includes detailed operation logs and timestamps for troubleshooting
 
 ## Configuration
 
@@ -139,6 +144,10 @@ BackupLens is designed to operate **completely offline** without internet connec
 - **No Automatic Updates**: The database volume persists locally, no internet required after initial setup
 - **Local Database Support**: Optionally mount pre-downloaded ClamAV database files (`.cvd` files) to `./clamav-db/` directory
 - **Initial Database**: The Docker image includes a base virus database that works immediately
+- **Debug Configuration**: Custom ClamAV configuration file (`config/clamav/clamd.conf`) enables debug and verbose logging
+  - Logs are output to stdout for easy viewing via container logs
+  - Includes timestamps and detailed operation information
+  - To view debug logs: `docker logs -f clamav` or `podman logs -f clamav`
 
 To update ClamAV database manually (when online):
 ```bash
@@ -196,6 +205,7 @@ podman exec clamav freshclam
 - Docker and Docker Compose
 - YARA rules directory (mount at `./yara-rules`)
 - (Optional) Pre-downloaded ClamAV database files in `./clamav-db/`
+- ClamAV configuration file in `./config/clamav/clamd.conf` (debug logging enabled)
 
 **Running the Pipeline:**
 
@@ -232,6 +242,7 @@ The pipeline runs continuously, scanning the incoming directory every 5 seconds 
 - Podman and Podman Compose (or `podman` + `docker-compose`)
 - YARA rules directory (mount at `./yara-rules`)
 - (Optional) Pre-downloaded ClamAV database files in `./clamav-db/`
+- ClamAV configuration file in `./config/clamav/clamd.conf` (debug logging enabled)
 
 **Running the Pipeline:**
 
@@ -281,7 +292,9 @@ The pipeline expects the following directories:
 - `./quarantine/`: Quarantined files (write)
 - `./yara-rules/`: YARA rule files (writable, `.yar` or `.yara` format - can be updated and reloaded)
 - `./clamav-db/`: (Optional) Pre-downloaded ClamAV database files (read-only)
+- `./config/clamav/clamd.conf`: ClamAV daemon configuration with debug logging enabled (read-only)
 - `./config/`: Configuration files (read-only)
+  - `./config/clamav/clamd.conf`: ClamAV daemon configuration with debug logging enabled
 
 ### Configuration Options
 
@@ -425,6 +438,11 @@ YARA_RULES_DIR=./my-rules PORT=8083 ./bin/yara-scanner
 # Make sure ClamAV and YARA scanner are running on localhost first
 # Note: If ClamAV can't access files, it will log warnings but continue scanning
 ./bin/backuplens-pipeline
+
+# View ClamAV debug logs (if running in container)
+docker logs -f clamav
+# or
+podman logs -f clamav
 
 # Or with custom config:
 INCOMING_DIR=./input QUARANTINE_DIR=./quarantined SCORING_CONFIG=./my-config.yaml \

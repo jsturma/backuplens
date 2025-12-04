@@ -8,9 +8,12 @@ ports:
 volumes:
 - clamd-db:/var/lib/clamav  # Persistent database volume (works offline)
 - ./clamav-db:/var/lib/clamav/local:ro  # Optional: pre-downloaded .cvd files
+- ./config/clamav/clamd.conf:/etc/clamav/clamd.conf:ro  # Custom config with debug enabled
+command: ["clamd", "--config-file=/etc/clamav/clamd.conf", "--foreground"]
 # Note: Database persists in volume, no internet required after initial setup
 # To update database manually: docker exec clamav freshclam (when online)
 # For Podman: podman exec clamav freshclam
+# Debug output is enabled via custom clamd.conf (logs to stdout)
 restart: unless-stopped
 
 
