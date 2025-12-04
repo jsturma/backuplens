@@ -102,15 +102,130 @@ Management service for updating ClamAV virus database. Provides HTTP API to trig
 
 **Default Port:** `8082` (configurable via `PORT` environment variable)
 
+**How It Works:**
+- Automatically detects available container runtime (Podman preferred, falls back to Docker)
+- Executes `freshclam` inside the ClamAV container to update virus definitions
+- Requires access to container runtime socket (Docker or Podman socket)
+- Updates are stored in the persistent ClamAV database volume
+
 **Endpoints:**
-- `GET /health` - Health check
-- `POST /update` - Trigger ClamAV database update
+
+1. **Health Check** - `GET /health`
+   ```bash
+   curl http://localhost:8082/health
+   ```
+   Response:
+   ```json
+   {
+     "status": "healthy",
+     "clamav_host": "clamav:3310"
+   }
+   ```
+
+2. **Trigger Update** - `POST /update`
+   ```bash
+   curl -X POST http://localhost:8082/update
+   ```
+   
+   **Success Response (200):**
+   ```json
+   {
+     "success": true,
+     "message": "Database updated successfully (podman)\n...",
+     "timestamp": "2025-12-04T12:00:00Z"
+   }
+   ```
 
 **Error Handling:**
 The service provides intelligent error handling for common ClamAV update scenarios:
-- **Rate Limiting (429)**: Returns appropriate status when ClamAV CDN rate limits requests
-- **Outdated Version**: Detects and reports when ClamAV installation is outdated
-- **Cooldown Periods**: Handles retry-after periods gracefully
+
+- **Rate Limiting (429)**: Returns `429 Too Many Requests` when ClamAV CDN rate limits requests
+  ```json
+  {
+    "success": false,
+    "message": "Rate limited by ClamAV CDN. Please wait before retrying.\n...",
+    "timestamp": "2025-12-04T12:00:00Z"
+  }
+  ```
+
+- **Outdated Version (400)**: Returns `400 Bad Request` when ClamAV installation is outdated
+  ```json
+  {
+    "success": false,
+    "message": "ClamAV installation is outdated. Please update the ClamAV container image.\n...",
+    "timestamp": "2025-12-04T12:00:00Z"
+  }
+  ```
+
+- **Cooldown Period (429)**: Returns `429 Too Many Requests` when update is on cooldown
+  ```json
+  {
+    "success": false,
+    "message": "Update on cooldown. Please wait before retrying.\n...",
+    "timestamp": "2025-12-04T12:00:00Z"
+  }
+  ```
+
+- **Container Runtime Not Found (500)**: Returns `500 Internal Server Error` if neither Podman nor Docker is available
+  ```json
+  {
+    "success": false,
+    "message": "Neither Podman nor Docker found in PATH",
+    "timestamp": "2025-12-04T12:00:00Z"
+  }
+  ```
+
+**Configuration:**
+- `PORT`: Service port (default: `8082`)
+- `CLAMAV_HOST`: ClamAV container name (default: `clamav`)
+- `CLAMAV_PORT`: ClamAV port (default: `3310`)
+
+**Requirements:**
+- Container runtime (Podman or Docker) must be installed and accessible
+- ClamAV container must be running with name `clamav` (or name specified in `CLAMAV_HOST`)
+- For Docker: Requires access to `/var/run/docker.sock` (mounted in compose files)
+- For Podman: Requires access to `/run/podman/podman.sock` (mounted in compose files)
+
+**Usage Examples:**
+
+**Start locally:**
+```bash
+# Build the service
+cd services/clamav-updater
+go build -o ../../bin/clamav-updater .
+
+# Run locally (requires ClamAV container running)
+./bin/clamav-updater
+
+# Or with custom configuration
+CLAMAV_HOST=my-clamav PORT=9000 ./bin/clamav-updater
+```
+
+**Trigger update via API:**
+```bash
+# Using curl
+curl -X POST http://localhost:8082/update
+
+# Using curl with pretty JSON output
+curl -X POST http://localhost:8082/update | jq
+
+# Check health
+curl http://localhost:8082/health | jq
+```
+
+**Using with Docker Compose:**
+The service is automatically started with Docker Compose and has access to the Docker socket. Updates can be triggered via:
+```bash
+curl -X POST http://localhost:8082/update
+```
+
+**Using with Podman Compose:**
+The service is automatically started with Podman Compose and has access to the Podman socket. Updates can be triggered via:
+```bash
+curl -X POST http://localhost:8082/update
+```
+
+**Note:** The service automatically detects and uses Podman when available, falling back to Docker if Podman is not found. This allows the same service to work seamlessly in both environments.
 
 ### Supporting Services
 
@@ -460,8 +575,20 @@ INCOMING_DIR=./input QUARANTINE_DIR=./quarantined SCORING_CONFIG=./my-config.yam
 
 4. **Start ClamAV Updater** (optional):
 ```bash
+# Start the updater service
 ./bin/clamav-updater
+
+# In another terminal, trigger an update
+curl -X POST http://localhost:8082/update
+
+# Check service health
+curl http://localhost:8082/health
 ```
+
+**Note:** The ClamAV Updater requires:
+- ClamAV container to be running (named `clamav` by default)
+- Access to container runtime (Podman or Docker)
+- For local runs, ensure the container runtime socket is accessible
 
 ### Build Output
 
