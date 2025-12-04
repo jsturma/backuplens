@@ -461,26 +461,37 @@ A standalone tool for analyzing file entropy to help understand and tune entropy
 - Generates entropy distribution histograms
 - Suggests optimal thresholds based on file type
 - Shows how many samples would be flagged by the pipeline's threshold (6.5)
+- Supports JSON output for programmatic processing
 
 **Usage:**
 ```bash
 # Build the tool
 make entropy-map
 
-# Analyze one or more files
+# Analyze one or more files (text output)
 ./bin/entropy-map <file1> [file2] [file3]...
 
-# Example
+# Analyze with JSON output
+./bin/entropy-map --json <file1> [file2] [file3]...
+
+# Examples
 ./bin/entropy-map ./incoming/sample.txt ./incoming/binary.dat
+./bin/entropy-map --json config/scoring.yaml
 ```
 
-**Output includes:**
+**Text Output includes:**
 - Detected MIME type
 - File type classification (Text/Binary)
 - Entropy statistics (min, max, median, mean)
-- Distribution histogram
+- Distribution histogram (ASCII visualization)
 - Suggested threshold for anomaly detection
 - Count of samples above pipeline threshold (6.5)
+
+**JSON Output includes:**
+- All text output data in structured JSON format
+- Histogram data as structured bins with ranges and counts
+- Pipeline threshold analysis with percentages
+- Suitable for integration with other tools or scripts
 
 ## Development
 
