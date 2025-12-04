@@ -9,7 +9,7 @@ flowchart TD
 A[Backup file input] --> B{MIME / Magic}
 B --> |Archive| C[Extractor & Normalizer]
 B --> |Single file| D[Preprocessing]
-C --> E[ClamAV via clamd / ICAP]
+C --> E[ClamAV via clamd TCP]
 D --> E
 E --> F[YARA Scanner]
 F --> G[Entropy Analysis]
@@ -113,7 +113,6 @@ The service provides intelligent error handling for common ClamAV update scenari
 ### Supporting Services
 
 - **ClamAV**: Virus scanning daemon (using official `clamav/clamav:latest` Alpine-based image)
-- **c-icap**: ICAP protocol server for ClamAV integration
 
 ## Configuration
 

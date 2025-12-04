@@ -14,18 +14,6 @@ volumes:
 restart: unless-stopped
 
 
-c-icap:
-image: schickling/c-icap
-container_name: c-icap
-environment:
-- CI_CAP_MAXSIZE=1073741824
-ports:
-- "1344:1344" # ICAP default
-depends_on:
-- clamav
-restart: unless-stopped
-
-
 yara-scanner:
 build:
 context: ./services/yara-scanner
@@ -67,8 +55,6 @@ environment:
 - CLAMD_PORT=3310
 - YARA_HOST=yara-scanner
 - YARA_PORT=8081
-- ICAP_HOST=c-icap
-- ICAP_PORT=1344
 - INCOMING_DIR=/incoming
 - QUARANTINE_DIR=/quarantine
 - SCORING_CONFIG=/config/scoring.yaml
@@ -80,7 +66,6 @@ volumes:
 depends_on:
 - clamav
 - yara-scanner
-- c-icap
 restart: on-failure
 
 
