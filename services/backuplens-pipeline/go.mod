@@ -1,4 +1,4 @@
-module backuplens/services/pipeline-go
+module backuplens/services/backuplens-pipeline
 
 go 1.25.4
 

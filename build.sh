@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/bin"
-SERVICES=("pipeline-go" "yara-scanner" "clamav-updater")
+SERVICES=("backuplens-pipeline" "yara-scanner" "clamav-updater")
 
 echo "Building BackupLens services..."
 echo "Build directory: ${BUILD_DIR}"
@@ -42,7 +42,7 @@ echo "Build complete!"
 echo "Binaries are in: ${BUILD_DIR}"
 echo ""
 echo "To run services:"
-echo "  ./bin/pipeline-go"
+echo "  ./bin/backuplens-pipeline"
 echo "  ./bin/yara-scanner"
 echo "  ./bin/clamav-updater"
 

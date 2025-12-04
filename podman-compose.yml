@@ -58,7 +58,7 @@ restart: unless-stopped
 
 pipeline:
 build:
-context: ./services/pipeline-go
+context: ./services/backuplens-pipeline
 dockerfile: Dockerfile
 container_name: backup-pipeline
 environment:

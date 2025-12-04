@@ -4,7 +4,7 @@
 # Build configuration
 GO_VERSION := 1.21
 BUILD_DIR := ./bin
-SERVICES := pipeline-go yara-scanner clamav-updater
+SERVICES := backuplens-pipeline yara-scanner clamav-updater
 TOOLS := entropy-map
 
 # Colors for output
@@ -20,7 +20,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "Examples:"
 	@echo "  make build          # Build all services"
-	@echo "  make build SERVICE=pipeline-go  # Build specific service"
+	@echo "  make build SERVICE=backuplens-pipeline  # Build specific service"
 	@echo "  make install       # Build and install to /usr/local/bin"
 	@echo "  make clean         # Remove build artifacts"
 
@@ -67,7 +67,7 @@ build: ## Build all services and tools
 build-service: ## Build a specific service (use SERVICE=name)
 	@if [ -z "$(SERVICE)" ]; then \
 		echo "$(YELLOW)Error: SERVICE variable not set$(NC)"; \
-		echo "Usage: make build-service SERVICE=pipeline-go"; \
+		echo "Usage: make build-service SERVICE=backuplens-pipeline"; \
 		exit 1; \
 	fi
 	@echo "$(GREEN)Building $(SERVICE)...$(NC)"
@@ -112,8 +112,8 @@ vet: ## Run go vet on all services
 lint: fmt vet ## Run formatting and vetting
 
 # Service-specific targets
-pipeline-go: ## Build pipeline-go service
-	@$(MAKE) build-service SERVICE=pipeline-go
+backuplens-pipeline: ## Build backuplens-pipeline service
+	@$(MAKE) build-service SERVICE=backuplens-pipeline
 
 yara-scanner: ## Build yara-scanner service
 	@$(MAKE) build-service SERVICE=yara-scanner

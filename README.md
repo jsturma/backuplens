@@ -48,7 +48,7 @@ BackupLens provides a multi-layered security scanning pipeline for backup files.
 ```
 BackupLens/
 ├── services/              # Service implementations
-│   ├── pipeline-go/      # Go pipeline implementation
+│   ├── backuplens-pipeline/      # Go pipeline implementation
 │   ├── yara-scanner/     # YARA scanner service (Go)
 │   └── clamav-updater/   # ClamAV database updater service (Go)
 ├── tools/                 # Analysis and utility tools
@@ -67,7 +67,7 @@ BackupLens/
 
 ### Pipeline Service
 
-Go-based implementation (`services/pipeline-go/`) using:
+Go-based implementation (`services/backuplens-pipeline/`) using:
 - `mimetype` for MIME type detection
 - Direct TCP connection to ClamAV daemon (`clamd`) for virus scanning
 - YARA scanner HTTP API for pattern matching
@@ -317,7 +317,7 @@ BackupLens can be built and run without Docker using standard Go tooling.
 
 - Go 1.25.4 or later (Go 1.23+ required for dependencies)
 - YARA library and development headers (for yara-scanner) - **CGO required**
-- ClamAV (for pipeline-go to connect to)
+- ClamAV (for backuplens-pipeline to connect to)
 - Make (optional, for using Makefile)
 
 **Note**: The yara-scanner service requires CGO to be enabled as it uses C bindings to the YARA library. This is automatically handled in the Dockerfile, but when building locally, ensure CGO is enabled.
@@ -342,7 +342,7 @@ sudo dnf install yara-devel
 make build
 
 # Build specific service
-make build-service SERVICE=pipeline-go
+make build-service SERVICE=backuplens-pipeline
 
 # Build entropy map tool
 make entropy-map
@@ -361,10 +361,10 @@ make help
 
 **Manual build:**
 ```bash
-# Build pipeline-go
-cd services/pipeline-go
+# Build backuplens-pipeline
+cd services/backuplens-pipeline
 go mod download
-go build -o ../../bin/pipeline-go .
+go build -o ../../bin/backuplens-pipeline .
 
 # Build yara-scanner (requires CGO and YARA development libraries)
 cd services/yara-scanner
@@ -425,11 +425,11 @@ YARA_RULES_DIR=./my-rules PORT=8083 ./bin/yara-scanner
 # Defaults to localhost:3310 for ClamAV and localhost:8081 for YARA
 # Make sure ClamAV and YARA scanner are running on localhost first
 # Note: If ClamAV can't access files, it will log warnings but continue scanning
-./bin/pipeline-go
+./bin/backuplens-pipeline
 
 # Or with custom config:
 INCOMING_DIR=./input QUARANTINE_DIR=./quarantined SCORING_CONFIG=./my-config.yaml \
-  CLAMD_HOST=localhost YARA_HOST=localhost ./bin/pipeline-go
+  CLAMD_HOST=localhost YARA_HOST=localhost ./bin/backuplens-pipeline
 ```
 
 **Important for Local Development:**
@@ -445,7 +445,7 @@ INCOMING_DIR=./input QUARANTINE_DIR=./quarantined SCORING_CONFIG=./my-config.yam
 ### Build Output
 
 All binaries are built to the `./bin/` directory:
-- `./bin/pipeline-go` - Main scanning pipeline
+- `./bin/backuplens-pipeline` - Main scanning pipeline
 - `./bin/yara-scanner` - YARA scanning service
 - `./bin/clamav-updater` - ClamAV database updater
 - `./bin/entropy-map` - Entropy analysis tool
@@ -499,8 +499,8 @@ make entropy-map
 
 ```bash
 # Go pipeline
-cd services/pipeline-go
-docker build -t backup-pipeline-go .
+cd services/backuplens-pipeline
+docker build -t backuplens-pipeline .
 
 # YARA scanner
 cd services/yara-scanner
@@ -515,8 +515,8 @@ docker build -t clamav-updater .
 
 ```bash
 # Go pipeline
-cd services/pipeline-go
-podman build -t backup-pipeline-go .
+cd services/backuplens-pipeline
+podman build -t backuplens-pipeline .
 
 # YARA scanner
 cd services/yara-scanner
