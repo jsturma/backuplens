@@ -51,6 +51,9 @@ BackupLens/
 │   ├── pipeline-go/      # Go pipeline implementation
 │   ├── yara-scanner/     # YARA scanner service (Go)
 │   └── clamav-updater/   # ClamAV database updater service (Go)
+├── tools/                 # Analysis and utility tools
+│   └── analyze/          # Analysis tools
+│       └── entropy-analyzer.go  # Entropy analysis tool
 ├── config/               # Configuration files
 │   └── scoring.yaml      # Scoring weights and thresholds
 ├── docker-compose.yml    # Docker Compose configuration
@@ -335,11 +338,14 @@ sudo dnf install yara-devel
 
 **Using Makefile (recommended):**
 ```bash
-# Build all services
+# Build all services and tools
 make build
 
 # Build specific service
 make build-service SERVICE=pipeline-go
+
+# Build entropy analyzer tool
+make entropy-analyzer
 
 # Install to /usr/local/bin
 make install
@@ -369,6 +375,11 @@ CGO_ENABLED=1 go build -o ../../bin/yara-scanner .
 cd services/clamav-updater
 go mod download
 go build -o ../../bin/clamav-updater .
+
+# Build entropy-analyzer tool
+cd tools/analyze
+go mod download
+go build -o ../../bin/entropy-analyzer entropy-analyzer.go
 ```
 
 ### Running Without Docker
@@ -437,6 +448,39 @@ All binaries are built to the `./bin/` directory:
 - `./bin/pipeline-go` - Main scanning pipeline
 - `./bin/yara-scanner` - YARA scanning service
 - `./bin/clamav-updater` - ClamAV database updater
+- `./bin/entropy-analyzer` - Entropy analysis tool
+
+### Analysis Tools
+
+**Entropy Analyzer** (`./bin/entropy-analyzer`):
+A standalone tool for analyzing file entropy to help understand and tune entropy thresholds.
+
+**Features:**
+- Uses MIME type detection (same library as pipeline) for accurate file type identification
+- Analyzes text files line-by-line and binary files in 1KB blocks
+- Generates entropy distribution histograms
+- Suggests optimal thresholds based on file type
+- Shows how many samples would be flagged by the pipeline's threshold (6.5)
+
+**Usage:**
+```bash
+# Build the tool
+make entropy-analyzer
+
+# Analyze one or more files
+./bin/entropy-analyzer <file1> [file2] [file3]...
+
+# Example
+./bin/entropy-analyzer ./incoming/sample.txt ./incoming/binary.dat
+```
+
+**Output includes:**
+- Detected MIME type
+- File type classification (Text/Binary)
+- Entropy statistics (min, max, median, mean)
+- Distribution histogram
+- Suggested threshold for anomaly detection
+- Count of samples above pipeline threshold (6.5)
 
 ## Development
 
