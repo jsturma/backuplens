@@ -5,7 +5,7 @@
 GO_VERSION := 1.21
 BUILD_DIR := ./bin
 SERVICES := pipeline-go yara-scanner clamav-updater
-TOOLS := entropy-analyzer
+TOOLS := entropy-map
 
 # Colors for output
 GREEN := \033[0;32m
@@ -121,11 +121,11 @@ yara-scanner: ## Build yara-scanner service
 clamav-updater: ## Build clamav-updater service
 	@$(MAKE) build-service SERVICE=clamav-updater
 
-entropy-analyzer: ## Build entropy-analyzer tool
-	@echo "$(GREEN)Building entropy-analyzer...$(NC)"
+entropy-map: ## Build entropy-map tool
+	@echo "$(GREEN)Building entropy-map...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	@cd tools/analyze && go build -o ../../$(BUILD_DIR)/entropy-analyzer entropy-analyzer.go
-	@echo "$(GREEN)entropy-analyzer built in $(BUILD_DIR)/$(NC)"
+	@cd tools/analyze && go build -o ../../$(BUILD_DIR)/entropy-map entropy-map.go
+	@echo "$(GREEN)entropy-map built in $(BUILD_DIR)/$(NC)"
 
 # Container management targets
 podman-up: ## Start services with Podman Compose

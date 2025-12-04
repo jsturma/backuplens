@@ -53,7 +53,7 @@ BackupLens/
 │   └── clamav-updater/   # ClamAV database updater service (Go)
 ├── tools/                 # Analysis and utility tools
 │   └── analyze/          # Analysis tools
-│       └── entropy-analyzer.go  # Entropy analysis tool
+│       └── entropy-map.go  # Entropy analysis tool
 ├── config/               # Configuration files
 │   └── scoring.yaml      # Scoring weights and thresholds
 ├── docker-compose.yml    # Docker Compose configuration
@@ -344,8 +344,8 @@ make build
 # Build specific service
 make build-service SERVICE=pipeline-go
 
-# Build entropy analyzer tool
-make entropy-analyzer
+# Build entropy map tool
+make entropy-map
 
 # Install to /usr/local/bin
 make install
@@ -376,10 +376,10 @@ cd services/clamav-updater
 go mod download
 go build -o ../../bin/clamav-updater .
 
-# Build entropy-analyzer tool
+# Build entropy-map tool
 cd tools/analyze
 go mod download
-go build -o ../../bin/entropy-analyzer entropy-analyzer.go
+go build -o ../../bin/entropy-map entropy-map.go
 ```
 
 ### Running Without Docker
@@ -448,11 +448,11 @@ All binaries are built to the `./bin/` directory:
 - `./bin/pipeline-go` - Main scanning pipeline
 - `./bin/yara-scanner` - YARA scanning service
 - `./bin/clamav-updater` - ClamAV database updater
-- `./bin/entropy-analyzer` - Entropy analysis tool
+- `./bin/entropy-map` - Entropy analysis tool
 
 ### Analysis Tools
 
-**Entropy Analyzer** (`./bin/entropy-analyzer`):
+**Entropy Map** (`./bin/entropy-map`):
 A standalone tool for analyzing file entropy to help understand and tune entropy thresholds.
 
 **Features:**
@@ -465,13 +465,13 @@ A standalone tool for analyzing file entropy to help understand and tune entropy
 **Usage:**
 ```bash
 # Build the tool
-make entropy-analyzer
+make entropy-map
 
 # Analyze one or more files
-./bin/entropy-analyzer <file1> [file2] [file3]...
+./bin/entropy-map <file1> [file2] [file3]...
 
 # Example
-./bin/entropy-analyzer ./incoming/sample.txt ./incoming/binary.dat
+./bin/entropy-map ./incoming/sample.txt ./incoming/binary.dat
 ```
 
 **Output includes:**

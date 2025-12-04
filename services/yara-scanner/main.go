@@ -76,7 +76,7 @@ func loadRules() error {
 			rulesDir = "yara-rules"
 		} else {
 			// Fall back to container path
-			rulesDir = "/rules"
+		rulesDir = "/rules"
 		}
 	}
 

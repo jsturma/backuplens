@@ -149,7 +149,7 @@ func scanClamAV(path string, clamdAddr string) (string, error) {
 		if readErr == nil && n > 0 {
 			response = string(buf[:n])
 		} else {
-			return "", fmt.Errorf("failed to read response: %w", err)
+		return "", fmt.Errorf("failed to read response: %w", err)
 		}
 	}
 
@@ -294,7 +294,7 @@ func processFile(path string, config *ScoringConfig, clamdAddr string, yaraHost 
 	} else {
 		if clamResult != "" {
 			log.Printf("[%s] ClamAV detected threat: %s", filepath.Base(path), clamResult)
-			result.ClamAVResult = clamResult
+		result.ClamAVResult = clamResult
 		} else {
 			log.Printf("[%s] ClamAV scan completed: no threats found", filepath.Base(path))
 			result.ClamAVResult = ""
@@ -406,7 +406,7 @@ func main() {
 			configPath = "config/scoring.yaml"
 		} else {
 			// Fall back to container path
-			configPath = "/config/scoring.yaml"
+		configPath = "/config/scoring.yaml"
 		}
 	}
 	clamdHost := os.Getenv("CLAMD_HOST")
