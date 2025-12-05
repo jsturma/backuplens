@@ -103,9 +103,9 @@ Management service for updating ClamAV virus database. Provides HTTP API to trig
 **Default Port:** `8082` (configurable via `PORT` environment variable)
 
 **How It Works:**
+- Runs as a standalone service/process (not containerized)
 - Automatically detects available container runtime (Podman preferred, falls back to Docker)
 - Executes `freshclam` inside the ClamAV container to update virus definitions
-- Requires access to container runtime socket (Docker or Podman socket)
 - Updates are stored in the persistent ClamAV database volume
 
 **Endpoints:**
@@ -181,10 +181,9 @@ The service provides intelligent error handling for common ClamAV update scenari
 - `CLAMAV_PORT`: ClamAV port (default: `3310`)
 
 **Requirements:**
-- Container runtime (Podman or Docker) must be installed and accessible
+- Container runtime (Podman or Docker) must be installed and accessible on the host
 - ClamAV container must be running with name `clamav` (or name specified in `CLAMAV_HOST`)
-- For Docker: Requires access to `/var/run/docker.sock` (mounted in compose files)
-- For Podman: Requires access to `/run/podman/podman.sock` (mounted in compose files)
+- Service must run on the host (not in a container) to access container runtime
 
 **Usage Examples:**
 
@@ -213,19 +212,9 @@ curl -X POST http://localhost:8082/update | jq
 curl http://localhost:8082/health | jq
 ```
 
-**Using with Docker Compose:**
-The service is automatically started with Docker Compose and has access to the Docker socket. Updates can be triggered via:
-```bash
-curl -X POST http://localhost:8082/update
-```
-
-**Using with Podman Compose:**
-The service is automatically started with Podman Compose and has access to the Podman socket. Updates can be triggered via:
-```bash
-curl -X POST http://localhost:8082/update
-```
-
 **Note:** The service automatically detects and uses Podman when available, falling back to Docker if Podman is not found. This allows the same service to work seamlessly in both environments.
+
+**Important:** This service runs as a standalone process on the host, not in a container. This is required to access the container runtime (Podman/Docker) to execute commands in the ClamAV container.
 
 ### Supporting Services
 
@@ -308,7 +297,7 @@ docker exec clamav freshclam
 podman exec clamav freshclam
 ```
 
-**Note**: The ClamAV updater service automatically detects and uses Podman or Docker. It requires container runtime socket access to execute updates. The database updates are stored in the persistent volume and will be available after container restarts.
+**Note**: The ClamAV updater service runs as a standalone process (not containerized) and automatically detects and uses Podman or Docker. It requires container runtime access on the host to execute updates. The database updates are stored in the persistent volume and will be available after container restarts.
 
 **Important**: The service uses the official ClamAV image (`clamav/clamav:latest`) which provides up-to-date ClamAV versions. If you encounter rate limiting or version warnings, the service will return appropriate HTTP status codes with detailed error messages.
 
@@ -393,7 +382,7 @@ podman-compose -f podman-compose.yml logs -f pipeline
 make podman-logs
 ```
 
-**Note:** The ClamAV updater service automatically detects and uses Podman when available, falling back to Docker if Podman is not found.
+**Note:** The ClamAV updater service runs as a standalone process (not containerized) and automatically detects and uses Podman when available, falling back to Docker if Podman is not found.
 
 ### Option 2: Building and Running Without Containers
 
@@ -585,10 +574,9 @@ curl -X POST http://localhost:8082/update
 curl http://localhost:8082/health
 ```
 
-**Note:** The ClamAV Updater requires:
+**Note:** The ClamAV Updater runs as a standalone service (not in a container) and requires:
 - ClamAV container to be running (named `clamav` by default)
-- Access to container runtime (Podman or Docker)
-- For local runs, ensure the container runtime socket is accessible
+- Container runtime (Podman or Docker) installed and accessible on the host
 
 ### Build Output
 
@@ -654,9 +642,9 @@ docker build -t backuplens-pipeline .
 cd services/yara-scanner
 docker build -t yara-scanner .
 
-# ClamAV updater
+# ClamAV updater (runs as process, not containerized)
 cd services/clamav-updater
-docker build -t clamav-updater .
+go build -o ../../bin/clamav-updater .
 ```
 
 ### Building with Podman
@@ -670,9 +658,9 @@ podman build -t backuplens-pipeline .
 cd services/yara-scanner
 podman build -t yara-scanner .
 
-# ClamAV updater
+# ClamAV updater (runs as process, not containerized)
 cd services/clamav-updater
-podman build -t clamav-updater .
+go build -o ../../bin/clamav-updater .
 ```
 
 **Note:** All Docker commands work with Podman as Podman is CLI-compatible with Docker. Simply replace `docker` with `podman` in any command.

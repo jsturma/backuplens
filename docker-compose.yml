@@ -31,23 +31,6 @@ environment:
 restart: unless-stopped
 
 
-clamav-updater:
-build:
-context: ./services/clamav-updater
-dockerfile: Dockerfile
-container_name: clamav-updater
-ports:
-- "8082:8082"
-volumes:
-- /var/run/docker.sock:/var/run/docker.sock:ro  # Read-only access to Docker socket
-environment:
-- CLAMAV_HOST=clamav
-- CLAMAV_PORT=3310
-depends_on:
-- clamav
-restart: unless-stopped
-
-
 pipeline:
 build:
 context: ./services/backuplens-pipeline

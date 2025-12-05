@@ -36,10 +36,21 @@ func healthHandler(c *gin.Context) {
 }
 
 func detectContainerRuntime() string {
-	// Check for Podman first (preferred)
+	// Check for Podman binary first (preferred)
 	if _, err := exec.LookPath("podman"); err == nil {
-		// Verify podman is working
+		// Check if Podman socket is mounted (indicates we're in a Podman environment)
+		// Use a file access check that works even with permission issues
+		_, statErr := os.Stat("/run/podman/podman.sock")
+		// If file exists (even if we can't read it due to permissions), socket is mounted
+		if statErr == nil || !os.IsNotExist(statErr) {
+			// Socket file exists (even if we can't access it), use Podman
+			return "podman"
+		}
+		// Also try Podman for local runs (without socket check)
+		// Try a simple command to see if Podman works
 		cmd := exec.Command("podman", "version", "--format", "{{.Version}}")
+		cmd.Stderr = nil
+		cmd.Stdout = nil
 		if err := cmd.Run(); err == nil {
 			return "podman"
 		}
@@ -66,7 +77,25 @@ func updateClamAVHandler(c *gin.Context) {
 	}
 
 	// Execute freshclam in the ClamAV container
-	cmd := exec.Command(runtime, "exec", "clamav", "freshclam")
+	var cmd *exec.Cmd
+	if runtime == "podman" {
+		// Use Podman - only set CONTAINER_HOST if socket is mounted (in container)
+		// On macOS, Podman uses SSH connections automatically, so don't override
+		cmd = exec.Command("podman", "exec", "clamav", "freshclam")
+		// Check if we're in a container environment with socket mounted
+		_, statErr := os.Stat("/run/podman/podman.sock")
+		if statErr == nil || !os.IsNotExist(statErr) {
+			// Socket exists (even if we can't read it), set CONTAINER_HOST for remote mode
+			// Also disable local storage to avoid overlayfs conflicts
+			cmd.Env = append(os.Environ(),
+				"CONTAINER_HOST=unix:///run/podman/podman.sock",
+				"CONTAINERS_CONF=/dev/null", // Disable local config to force remote mode
+			)
+		}
+		// If socket doesn't exist (local macOS run), Podman will use default connection
+	} else {
+		cmd = exec.Command(runtime, "exec", "clamav", "freshclam")
+	}
 
 	output, err := cmd.CombinedOutput()
 	outputStr := string(output)
